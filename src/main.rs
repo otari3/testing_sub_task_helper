@@ -43,10 +43,10 @@ fn main() {
         match curr_command.copied() {
             Some("help")=>handle_help_command(&commands),
             Some("add")=> {
-                handle_add_task(&mut current_tasks,&db_conn,&commands_as_vec);
+                handle_add_task(&mut current_tasks,&db_conn,&commands_as_vec,current_opened_task,&mut current_sub_tasks);
             }
             Some("open")=>{
-                current_opened_task = commands_as_vec[1].parse().unwrap();
+                current_opened_task = commands_as_vec[1].parse::<i32>().unwrap() -1;
                 current_sub_tasks = get_sub_tasks(&db_conn,&current_tasks,current_opened_task);
             }
             _ => println!("Not A Valid Command")
@@ -59,25 +59,43 @@ fn handle_help_command(commands: &HashMap<&str,&str>){
         println!("{} : {}",command,explanation)
     }
 }
-fn handle_add_task(tasks:&mut Vec<Tasks>,db_conn:&Connection,command:&Vec<&str>){
+fn handle_add_task(tasks:&mut Vec<Tasks>,db_conn:&Connection,command:&Vec<&str>,current_open_task_i:i32,sub_tasks:&mut Vec<SubTasks>){
     match command.get(1).copied() {
         Some("-t")=>{
             let task_name = command.get(2);
             if task_name.is_some() {
-                let task_name = *command.get(2).unwrap();
+                let task_name: String = command[2..].join(" ");
                 db_conn
                     .execute("INSERT INTO Tasks (name) VALUES (?1)",
                              params![task_name])
                     .expect("could not Insert");
+                // todo add correct sub_task ids instead of 0
                 tasks.push(Tasks{
                     id:0,
-                    name:String::from(task_name)
+                    name:task_name
                 });
                 print_tasks(tasks);
             }else {
                 println!("Task Name Needed");
             }
         },
+        Some("-s")=>{
+            let sub_task_name = command[2..].join(" ");
+            let current_task = tasks.get(current_open_task_i as usize).unwrap();
+            db_conn
+                .execute("INSERT INTO Subtasks (name, task, isIosDone, isAndroidDone)  VALUES (?1,?2,0,0)",
+                         params![sub_task_name,current_task.id])
+                .expect("could not Insert sub task");
+            // todo add correct sub_task ids instead of 0
+            sub_tasks.push(SubTasks{
+                id:0,
+                name:sub_task_name,
+                parent_task_id:current_task.id,
+                is_android_done:0,
+                is_ios_done:0
+            });
+            print_sub_tasks(sub_tasks)
+        }
         _ => println!("Not A Valid Add Argument")
     }
 }
@@ -111,7 +129,7 @@ fn get_tasks(conn:&Connection)->Vec<Tasks>{
     tasks
 }
 fn get_sub_tasks(conn:&Connection,tasks:&Vec<Tasks>,task_to_be_opened:i32)->Vec<SubTasks>{
-    let curr_task = tasks.get((task_to_be_opened-1) as usize);
+    let curr_task = tasks.get(task_to_be_opened as usize);
     let mut sub_tasks:Vec<SubTasks> = Vec::new();
     let mut stm = conn.prepare("SELECT Subtasks.id,t.id,Subtasks.name,isIosDone,isAndroidDone
                                                     FROM Subtasks
