@@ -65,13 +65,12 @@ fn handle_add_task(tasks:&mut Vec<Tasks>,db_conn:&Connection,command:&Vec<&str>,
             let task_name = command.get(2);
             if task_name.is_some() {
                 let task_name: String = command[2..].join(" ");
-                db_conn
-                    .execute("INSERT INTO Tasks (name) VALUES (?1)",
-                             params![task_name])
+                let id:i64 = db_conn
+                    .query_row("INSERT INTO Tasks (name) VALUES (?1) RETURNING id",
+                             params![task_name],|row| row.get(0))
                     .expect("could not Insert");
-                // todo add correct sub_task ids instead of 0
                 tasks.push(Tasks{
-                    id:0,
+                    id,
                     name:task_name
                 });
                 print_tasks(tasks);
@@ -82,13 +81,12 @@ fn handle_add_task(tasks:&mut Vec<Tasks>,db_conn:&Connection,command:&Vec<&str>,
         Some("-s")=>{
             let sub_task_name = command[2..].join(" ");
             let current_task = tasks.get(current_open_task_i as usize).unwrap();
-            db_conn
-                .execute("INSERT INTO Subtasks (name, task, isIosDone, isAndroidDone)  VALUES (?1,?2,0,0)",
-                         params![sub_task_name,current_task.id])
+            let id:i64 = db_conn
+                .query_row("INSERT INTO Subtasks (name, task, isIosDone, isAndroidDone)  VALUES (?1,?2,0,0) RETURNING id",
+                           params![sub_task_name,current_task.id], |row| row.get(0))
                 .expect("could not Insert sub task");
-            // todo add correct sub_task ids instead of 0
             sub_tasks.push(SubTasks{
-                id:0,
+                id,
                 name:sub_task_name,
                 parent_task_id:current_task.id,
                 is_android_done:0,
@@ -166,5 +164,8 @@ fn print_sub_tasks(sub_tasks: &Vec<SubTasks>){
         let current_sub_task = &sub_tasks[i];
         println!("{}: {} {} {}",i+1,current_sub_task.name,if current_sub_task.is_ios_done==1{"(IOS Done)"}else{""},if current_sub_task.is_android_done==1{"(Android Done)"}else{""})
     }
+}
+fn handle_done_sub_tasks(sub_tasks: &mut Vec<SubTasks>,db_conn:&Connection,command:&Vec<&str>){
+
 }
 
