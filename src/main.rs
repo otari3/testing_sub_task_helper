@@ -50,6 +50,11 @@ impl Tasks {
         };
         tasks
     }
+    fn delete_task(&self,db_conn:&Connection){
+        db_conn
+            .execute("DELETE FROM Tasks WHERE id = ?1",params![self.id])
+            .expect("could not delete task");
+    }
 }
 impl SubTasks {
     fn add_sub_task(db_conn:&Connection,command:&Vec<&str>,current_task:&Tasks)->Self{
@@ -116,6 +121,23 @@ impl SubTasks {
             .execute("UPDATE Subtasks SET isIosDone = 1 WHERE id = ?1",params![self.id])
             .expect("could not update subtask");
         self.is_ios_done = 1;
+    }
+    fn remove_android(&mut self,db_conn:&Connection){
+        db_conn
+            .execute("UPDATE Subtasks SET isAndroidDone = 0 WHERE id = ?1",params![self.id])
+            .expect("could not update subtask");
+        self.is_android_done = 0;
+    }
+    fn remove_ios(&mut self,db_conn:&Connection){
+        db_conn
+            .execute("UPDATE Subtasks SET isIosDone = 0 WHERE id = ?1",params![self.id])
+            .expect("could not update subtask");
+        self.is_ios_done = 0;
+    }
+    fn delete_sub_task(&self,db_conn:&Connection){
+        db_conn
+            .execute("DELETE FROM Subtasks WHERE id = ?1",params![self.id])
+            .expect("could not delete task");
     }
 }
 fn main() {
@@ -226,26 +248,18 @@ fn handle_remove_sub_tasks(sub_tasks: &mut Vec<SubTasks>,db_conn:&Connection,com
     match command.get(1).copied() {
         Some("-a")=>{
             let current_sub_task_i = command.get(2).unwrap().parse::<usize>().unwrap()-1;
-            let current_sub_task = sub_tasks.get(current_sub_task_i);
+            let current_sub_task = sub_tasks.get_mut(current_sub_task_i);
             if current_sub_task.is_some(){
-                db_conn
-                    .execute("UPDATE Subtasks SET isAndroidDone = 0 WHERE id = ?1",params![current_sub_task.unwrap().id])
-                    .expect("could not update subtask");
+                current_sub_task.unwrap().remove_android(db_conn);
             }
-            let new_sub_task = sub_tasks.get_mut(current_sub_task_i).unwrap();
-            new_sub_task.is_android_done = 0;
             SubTasks::print_sub_tasks(sub_tasks);
         },
         Some("-i")=>{
             let current_sub_task_i = command.get(2).unwrap().parse::<usize>().unwrap()-1;
-            let current_sub_task = sub_tasks.get(current_sub_task_i);
+            let current_sub_task = sub_tasks.get_mut(current_sub_task_i);
             if current_sub_task.is_some(){
-                db_conn
-                    .execute("UPDATE Subtasks SET isIosDone = 0 WHERE id = ?1",params![current_sub_task.unwrap().id])
-                    .expect("could not update subtask");
+               current_sub_task.unwrap().remove_ios(db_conn);
             }
-            let new_sub_task = sub_tasks.get_mut(current_sub_task_i).unwrap();
-            new_sub_task.is_ios_done = 0;
             SubTasks::print_sub_tasks(sub_tasks);
         }
         _=>{
@@ -259,9 +273,7 @@ fn handle_delete_task(tasks:&mut Vec<Tasks>,db_conn:&Connection,command:&Vec<&st
             let current_task_i = command.get(2).unwrap().parse::<usize>().unwrap()-1;
             let current_task = tasks.get(current_task_i);
             if current_task.is_some(){
-                db_conn
-                    .execute("DELETE FROM Tasks WHERE id = ?1",params![current_task.unwrap().id])
-                    .expect("could not delete task");
+                current_task.unwrap().delete_task(db_conn);
             }
             tasks.remove(current_task_i);
             Tasks::print_tasks(&tasks);
@@ -270,9 +282,7 @@ fn handle_delete_task(tasks:&mut Vec<Tasks>,db_conn:&Connection,command:&Vec<&st
             let current_sub_task_i = command.get(2).unwrap().parse::<usize>().unwrap()-1;
             let current_sub_task = sub_tasks.get(current_sub_task_i);
             if current_sub_task.is_some(){
-                db_conn
-                    .execute("DELETE FROM Subtasks WHERE id = ?1",params![current_sub_task.unwrap().id])
-                    .expect("could not delete task");
+                current_sub_task.unwrap().delete_sub_task(db_conn);
             }
             sub_tasks.remove(current_sub_task_i);
             SubTasks::print_sub_tasks(sub_tasks);
